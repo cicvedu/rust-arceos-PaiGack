@@ -7,42 +7,76 @@ use core::num::NonZeroUsize;
 
 use crate::{AllocResult, BaseAllocator, ByteAllocator};
 
-pub struct SimpleByteAllocator;
+pub struct SimpleByteAllocator {
+    start: usize,
+    size: usize,
+    used: usize,
+}
 
 impl SimpleByteAllocator {
     pub const fn new() -> Self {
-        Self {}
+        Self {
+            start: 0,
+            size: 0,
+            used: 0,
+        }
     }
 }
 
 impl BaseAllocator for SimpleByteAllocator {
-    fn init(&mut self, _start: usize, _size: usize) {
-        todo!();
+    fn init(&mut self, start: usize, size: usize) {
+        self.start = start;
+        self.size = size;
+        self.used = 0;
     }
 
-    fn add_memory(&mut self, _start: usize, _size: usize) -> AllocResult {
-        todo!();
+    fn add_memory(&mut self, start: usize, size: usize) -> AllocResult {
+        if start + size > self.start + self.size {
+            return Err(crate::AllocError::NoMemory);
+        }
+        self.size += size;
+        Ok(())
     }
 }
 
 impl ByteAllocator for SimpleByteAllocator {
-    fn alloc(&mut self, _layout: Layout) -> AllocResult<NonZeroUsize> {
-        todo!();
+    fn alloc(&mut self, layout: Layout) -> AllocResult<NonZeroUsize> {
+        let size = layout.size();
+        let align = layout.align();
+
+        let padding = align - (self.start + self.used) % align;
+        let pos = self.start + self.used + padding;
+
+        if pos + size > self.start + self.size {
+            return Err(crate::AllocError::NoMemory);
+        }
+
+        self.used += padding + size;
+
+        Ok(unsafe { NonZeroUsize::new_unchecked(pos) })
     }
 
-    fn dealloc(&mut self, _pos: NonZeroUsize, _layout: Layout) {
-        todo!();
+    fn dealloc(&mut self, pos: NonZeroUsize, layout: Layout) {
+        let size = layout.size();
+        let align = layout.align();
+
+        let padding = align - (self.start + self.used) % align;
+        let expected_pos = self.start + self.used + padding - size;
+
+        debug_assert_eq!(pos.get(), expected_pos);
+
+        self.used -= padding + size;
     }
 
     fn total_bytes(&self) -> usize {
-        todo!();
+        self.size
     }
 
     fn used_bytes(&self) -> usize {
-        todo!();
+        self.used
     }
 
     fn available_bytes(&self) -> usize {
-        todo!();
+        self.size - self.used
     }
 }
