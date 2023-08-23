@@ -10,7 +10,6 @@ use std::thread;
 
 static FLAG: AtomicUsize = AtomicUsize::new(0);
 
-
 // I AM NOT DONE
 
 #[cfg_attr(feature = "axstd", no_mangle)]
@@ -20,6 +19,7 @@ fn main() {
         while FLAG.load(Ordering::Relaxed) < 1 {
             // For cooperative scheduler, we must yield here!
             // For preemptive scheduler, just relaxed! Leave it for scheduler.
+            thread::yield_now();
         }
 
         let _ = FLAG.fetch_add(1, Ordering::Relaxed);
