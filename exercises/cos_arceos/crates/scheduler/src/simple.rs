@@ -1,11 +1,16 @@
 use alloc::{collections::VecDeque, sync::Arc};
-use core::ops::Deref;
+use core::{
+    ops::Deref,
+    sync::atomic::{AtomicU8, Ordering},
+    u8,
+};
 
 use crate::BaseScheduler;
 
 /// A task wrapper for the [`SimpleScheduler`].
 pub struct SimpleTask<T> {
     inner: T,
+    r_count: AtomicU8,
 }
 
 impl<T> SimpleTask<T> {
@@ -13,6 +18,7 @@ impl<T> SimpleTask<T> {
     pub const fn new(inner: T) -> Self {
         Self {
             inner,
+            r_count: AtomicU8::new(0),
         }
     }
 
@@ -81,8 +87,14 @@ impl<T> BaseScheduler for SimpleScheduler<T> {
         self.ready_queue.push_back(prev);
     }
 
-    fn task_tick(&mut self, _current: &Self::SchedItem) -> bool {
-        false // no reschedule
+    fn task_tick(&mut self, current: &Self::SchedItem) -> bool {
+        match current.r_count.fetch_add(1, Ordering::Relaxed) {
+            u8::MAX => {
+                current.r_count.store(0, Ordering::Relaxed);
+                true
+            }
+            _ => false,
+        }
     }
 
     fn set_priority(&mut self, _task: &Self::SchedItem, _prio: isize) -> bool {
