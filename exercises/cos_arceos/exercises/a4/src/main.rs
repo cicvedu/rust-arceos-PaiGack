@@ -8,7 +8,6 @@ extern crate axstd as std;
 use std::io::{self, prelude::*};
 use std::net::{TcpStream, ToSocketAddrs};
 
-
 // I AM NOT DONE
 
 const DEST: &str = "49.12.234.183:80";
@@ -24,7 +23,10 @@ fn client() -> io::Result<()> {
         println!("dest: {} ({})", DEST, addr);
     }
 
+    println!("connect...");
     let mut stream = TcpStream::connect(DEST)?;
+    println!("connect ok");
+
     stream.write_all(REQUEST.as_bytes())?;
     let mut buf = [0; 2048];
     let n = stream.read(&mut buf)?;
