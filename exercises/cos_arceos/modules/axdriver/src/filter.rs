@@ -1,11 +1,19 @@
+#[cfg(feature = "net")]
 use driver_net::{
     BaseDriverOps, DevError, DevResult, DeviceType, EthernetAddress, NetBufPtr, NetDriverOps,
 };
 
+#[cfg(not(feature = "net"))]
+pub struct NetFilter<T> {
+    pub inner: T,
+}
+
+#[cfg(feature = "net")]
 pub struct NetFilter<T: BaseDriverOps + NetDriverOps> {
     pub inner: T,
 }
 
+#[cfg(feature = "net")]
 impl<T: BaseDriverOps + NetDriverOps> NetFilter<T> {
     pub fn device_name(&self) -> &str {
         self.inner.device_name()
