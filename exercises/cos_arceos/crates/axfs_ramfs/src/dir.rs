@@ -165,8 +165,55 @@ impl VfsNodeOps for DirNode {
         }
     }
 
-    fn rename(&self, _src: &str, _dst: &str) -> VfsResult {
-        todo!("Implement rename for ramfs!");
+    fn rename(&self, src: &str, dst: &str) -> VfsResult {
+        log::debug!("rename at ramfs: {} ===> {}", src, dst);
+
+        if src == dst {
+            return Ok(());
+        }
+
+        let (src_name, src_rest) = split_path(src);
+        let (_, dst_rest) = split_path(dst);
+
+        if let Some(rest) = src_rest {
+            match src_name {
+                "" | "." => self.rename(rest, dst_rest.ok_or(VfsError::InvalidInput)?),
+
+                ".." => self
+                    .parent()
+                    .ok_or(VfsError::NotFound)?
+                    .rename(rest, dst_rest.ok_or(VfsError::InvalidInput)?),
+
+                _ => {
+                    let subdir = self
+                        .children
+                        .read()
+                        .get(src_name)
+                        .ok_or(VfsError::NotFound)?
+                        .clone();
+
+                    subdir.rename(rest, dst_rest.ok_or(VfsError::InvalidInput)?)
+                }
+            }
+        } else if src_name.is_empty() || src_name == "." || src_name == ".." {
+            Err(VfsError::InvalidInput) // remove '.' or '..
+        } else {
+            let (dst_name, _) = split_path(dst_rest.ok_or(VfsError::InvalidInput)?);
+
+            let mut children = self.children.write();
+            let node = children.get(src_name).ok_or(VfsError::NotFound)?;
+
+            if let Some(dir) = node.as_any().downcast_ref::<DirNode>() {
+                if !dir.children.read().is_empty() {
+                    return Err(VfsError::DirectoryNotEmpty);
+                }
+            }
+
+            let v = children.get(src_name).unwrap().clone();
+            children.remove(src_name);
+            children.insert(dst_name.into(), v);
+            Ok(())
+        }
     }
 
     axfs_vfs::impl_vfs_dir_default! {}
